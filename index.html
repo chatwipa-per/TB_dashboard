@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inspectra TB-Shield • Clinical Screening Dashboard</title>
+  
+  <!-- CSS & Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#faf5ff',
+              100: '#f3e8ff',
+              200: '#e9d5ff',
+              300: '#d8b4fe',
+              400: '#c084fc',
+              500: '#a855f7',
+              600: '#9333ea',
+              700: '#7e22ce',
+              800: '#6b21a8',
+              900: '#581c87',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Icon Libraries -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Core Charting & Parsing CDNs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  
+  <style>
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f8fafc;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #9333ea;
+    }
+    .custom-gradient {
+      background: linear-gradient(135deg, #fdf4ff 0%, #f1f5f9 100%);
+    }
+  </style>
+</head>
+<body class="h-full text-slate-800 font-sans antialiased flex flex-col custom-gradient">
+
+  <!-- Core Notification Toast System -->
+  <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Header Panel -->
+  <header class="border-b border-purple-100 bg-white/80 backdrop-blur sticky top-0 z-40 px-6 py-4 flex flex-wrap justify-between items-center gap-4 shadow-sm">
+    <div class="flex items-center gap-3">
+      <div class="p-2.5 bg-brand-600/10 text-brand-600 rounded-xl border border-brand-500/20 shadow-inner">
+        <i class="fa-solid fa-lungs-virus text-2xl"></i>
+      </div>
+      <div>
+        <h1 class="font-extrabold text-xl tracking-tight text-slate-900 flex items-center gap-2">
+          INSPECTRA-CXR TB DASHBOARD
+          <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-700 border border-brand-500/20 font-sans">AI v2.5</span>
+        </h1>
+        <p class="text-xs text-slate-500 font-sans">Clinical Tuberculosis Screening & AI Progress Intelligence Dashboard</p>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-3 font-sans">
+      <!-- Database & Mode Badges -->
+      <div class="flex items-center gap-2 bg-purple-50 border border-purple-100 px-3 py-1.5 rounded-lg text-xs">
+        <span id="pipeline-ping" class="h-2 w-2 rounded-full bg-slate-400"></span>
+        <span>Data Pipeline:</span>
+        <strong id="data-status-label" class="text-slate-500 font-bold font-sans">Awaiting Upload</strong>
+      </div>
+
+      <button id="clear-data-btn" onclick="app.clearData()" class="bg-white hover:bg-slate-50 text-xs text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm transition flex items-center gap-1.5">
+        <i class="fa-solid fa-trash-can text-slate-500"></i> Clear Workspace
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden font-sans">
+    
+    <!-- Left Controls / Quick Upload Panel -->
+    <aside class="w-full lg:w-80 bg-white/60 p-6 flex flex-col gap-6 overflow-y-auto border-r border-purple-100/80 shrink-0">
+      
+      <!-- Drag & Drop File Upload -->
+      <div>
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-3 mb-2 font-sans">Upload your screening data</p>
+        <div id="drop-zone" class="border-2 border-dashed border-purple-200 hover:border-brand-500 bg-white rounded-2xl p-5 text-center cursor-pointer transition flex flex-col items-center justify-center group relative overflow-hidden shadow-sm">
+          <input type="file" id="file-uploader" class="hidden" accept=".csv, .xlsx, .xls" multiple>
+          <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 group-hover:text-brand-500 transition mb-3"></i>
+          <span class="text-xs font-bold text-slate-700 block mb-1">Drag & Drop Screening File(s)</span>
+          <span class="text-[10px] text-slate-500 block font-sans font-sans">Supports multiple CSV / XLSX or XLS files</span>
+          <span class="text-[9px] text-brand-600 font-bold block mt-1 font-sans">Upload in many rounds to accumulate records</span>
+          
+          <div class="mt-4 flex flex-wrap gap-1 justify-center">
+            <span class="text-[9px] bg-slate-50 border border-slate-200 px-2 py-0.5 rounded text-slate-600">Patient ID</span>
+            <span class="text-[9px] bg-slate-50 border border-slate-200 px-2 py-0.5 rounded text-slate-600 font-sans">Tuberculosis</span>
+            <span class="text-[9px] bg-slate-50 border border-slate-200 px-2 py-0.5 rounded text-slate-600 font-sans">Study Date</span>
+          </div>
+        </div>
+
+        <!-- Multi-file Checklist Container -->
+        <div id="active-files-container" class="hidden mt-4 font-sans font-sans">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-3 mb-2">Active Ingested Files</p>
+          <div id="active-files-list" class="space-y-2 max-h-60 overflow-y-auto px-1">
+            <!-- Dynamic file cards are rendered here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- ALERT MESSAGE BOX FOR RECENT DEPLOYS/WARNINGS - MOVED TO THE BOTTOM OF THE SIDEBAR -->
+      <div id="dashboard-notice" class="bg-brand-5 border border-brand-200 p-4 rounded-2xl flex items-start gap-3.5 shadow-sm text-brand-950 mt-auto">
+        <i class="fa-solid fa-wand-magic-sparkles text-brand-600 text-lg shrink-0 mt-0.5 animate-pulse"></i>
+        <div class="flex-1">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <h4 class="text-xs font-extrabold tracking-wider uppercase text-brand-900 font-sans">DASHBOARD Ready</h4>
+          </div>
+          <p class="text-xs text-brand-800 mt-1 leading-relaxed">
+            Your workspace is ready. You can now select or drag-and-drop **multiple files at once**. The dashboard will combine and aggregate the screening logs seamlessly.
+          </p>
+        </div>
+        <button onclick="document.getElementById('dashboard-notice').remove()" class="text-brand-400 hover:text-brand-600 transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+    </aside>
+
+    <!-- Main Workspace (Central Flow) -->
+    <main class="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
+
+      <!-- Tab Content: Overview -->
+      <section id="tab-overview" class="flex flex-col gap-6">
+        
+        <!-- KPI Dashboard Header Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          
+          <!-- Card 1: Total Patients Screened -->
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center justify-between relative overflow-hidden group">
+            <div class="absolute -right-6 -bottom-6 text-purple-100/50 text-8xl font-black group-hover:scale-110 transition-transform duration-300 pointer-events-none">
+              <i class="fa-solid fa-users"></i>
+            </div>
+            <div class="relative z-10 font-sans font-sans">
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest font-sans">Total Screened</p>
+              <h3 id="stat-total-screened" class="text-3xl font-extrabold text-slate-800 mt-1.5 font-sans">0</h3>
+              <p class="text-[11px] text-slate-500 mt-2 flex items-center gap-1">
+                <i class="fa-solid fa-circle-check text-brand-600"></i> Active patient records
+              </p>
+            </div>
+            <div class="h-12 w-12 bg-purple-50 rounded-xl border border-purple-100 flex items-center justify-center text-brand-600 relative z-10 shrink-0">
+              <i class="fa-solid fa-users text-lg"></i>
+            </div>
+          </div>
+
+          <!-- Card 2: TB Detection Rate -->
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center justify-between relative overflow-hidden group">
+            <div class="absolute -right-6 -bottom-6 text-amber-100/50 text-8xl font-black group-hover:scale-110 transition-transform duration-300 pointer-events-none">
+              <i class="fa-solid fa-percent"></i>
+            </div>
+            <div class="relative z-10 font-sans">
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest">TB Detection Rate</p>
+              <h3 id="stat-detection-rate" class="text-3xl font-extrabold text-amber-600 mt-1.5">0.0%</h3>
+              <p class="text-[11px] text-slate-500 mt-2 flex items-center gap-1">
+                <i class="fa-solid fa-chart-line text-amber-500"></i> Proportion of total cases
+              </p>
+            </div>
+            <div class="h-12 w-12 bg-amber-50 rounded-xl border border-amber-100 flex items-center justify-center text-amber-600 relative z-10 shrink-0 font-sans">
+              <i class="fa-solid fa-percent text-lg"></i>
+            </div>
+          </div>
+
+          <!-- Card 3: AI Detected TB cases -->
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center justify-between relative overflow-hidden group">
+            <div class="absolute -right-6 -bottom-6 text-rose-100/50 text-8xl font-black group-hover:scale-110 transition-transform duration-300 pointer-events-none">
+              <i class="fa-solid fa-shield-virus"></i>
+            </div>
+            <div class="relative z-10 font-sans">
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest font-sans font-sans">AI Detected Cases</p>
+              <h3 id="stat-total-detected" class="text-3xl font-extrabold text-rose-600 mt-1.5 font-sans font-sans">0</h3>
+              <p class="text-[11px] text-slate-500 mt-2 flex items-center gap-1">
+                <i class="fa-solid fa-triangle-exclamation text-rose-500"></i> Marked positive (Not LOW)
+              </p>
+            </div>
+            <div class="h-12 w-12 bg-rose-50 rounded-xl border border-rose-100 flex items-center justify-center text-rose-600 relative z-10 shrink-0 font-sans font-sans font-sans font-sans">
+              <i class="fa-solid fa-shield-virus text-lg"></i>
+            </div>
+          </div>
+
+          <!-- Card 4: Normal Rate (LOW) -->
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center justify-between relative overflow-hidden group font-sans">
+            <div class="absolute -right-6 -bottom-6 text-emerald-100/50 text-8xl font-black group-hover:scale-110 transition-transform duration-300 pointer-events-none">
+              <i class="fa-solid fa-heart-pulse"></i>
+            </div>
+            <div class="relative z-10 font-sans">
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest">Normal / Low Risk</p>
+              <h3 id="stat-total-low" class="text-3xl font-extrabold text-emerald-600 mt-1.5 font-sans">0</h3>
+              <p class="text-[11px] text-slate-500 mt-2 flex items-center gap-1 text-slate-500">
+                <i class="fa-solid fa-shield text-emerald-500"></i> Classifed as Low/Negative
+              </p>
+            </div>
+            <div class="h-12 w-12 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center justify-center text-emerald-600 relative z-10 shrink-0 font-sans">
+              <i class="fa-solid fa-heart-pulse text-lg"></i>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 3 Group Count Cards (TB below 50, 50-70, 70 up) -->
+        <div class="bg-purple-50/30 p-5 rounded-2xl border border-purple-100 shadow-sm">
+          <p class="text-[10px] font-bold text-purple-950 uppercase tracking-widest mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-chart-bar text-brand-600"></i> TB Probability Stratification (Inspectra Score Profile)
+          </p>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 font-sans animate-fade-in">
+            
+            <!-- Group A: Below 50 -->
+            <div class="bg-white p-4 rounded-xl border border-emerald-100 shadow-sm flex items-center justify-between">
+              <div>
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block font-sans">TB Below 50 (&lt; 0.50)</span>
+                <strong id="stat-tb-below-50" class="text-2xl font-extrabold text-emerald-600 mt-1 block">0</strong>
+                <span class="text-[10px] text-slate-400 block mt-1">Normal or low-risk findings</span>
+              </div>
+              <div class="h-10 w-10 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
+                <i class="fa-solid fa-square-check text-base"></i>
+              </div>
+            </div>
+
+            <!-- Group B: 50-70 -->
+            <div class="bg-white p-4 rounded-xl border border-amber-100 shadow-sm flex items-center justify-between font-sans">
+              <div>
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block font-sans">TB 50 - 70 (0.50 - 0.70)</span>
+                <strong id="stat-tb-50-70" class="text-2xl font-extrabold text-amber-500 mt-1 block">0</strong>
+                <span class="text-[10px] text-slate-400 block mt-1 font-sans">Borderline moderate probability</span>
+              </div>
+              <div class="h-10 w-10 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-500 shrink-0">
+                <i class="fa-solid fa-circle-exclamation text-base"></i>
+              </div>
+            </div>
+
+            <!-- Group C: 70 Up -->
+            <div class="bg-white p-4 rounded-xl border border-rose-100 shadow-sm flex items-center justify-between">
+              <div>
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block font-sans">TB 70 Up (&gt; 0.70)</span>
+                <strong id="stat-tb-70-up" class="text-2xl font-extrabold text-rose-600 mt-1 block">0</strong>
+                <span class="text-[10px] text-slate-400 block mt-1 font-sans font-sans font-sans">High radiological certainty</span>
+              </div>
+              <div class="h-10 w-10 rounded-lg bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0">
+                <i class="fa-solid fa-triangle-exclamation text-base font-sans"></i>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Row 3: Progression Trend Chart (Full Width Bar + Line Chart with Dual Y-Axes) -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-4">
+          <div>
+            <h3 class="font-bold text-slate-800 text-base">TB Screening Progression Trend</h3>
+            <p class="text-xs text-slate-500 font-sans">Daily breakdown of total undergoing screening (Left Axis) vs. AI detected cases (Right Axis)</p>
+          </div>
+          <div class="relative h-[320px] w-full">
+            <canvas id="overview-chart"></canvas>
+          </div>
+        </div>
+
+        <!-- Row 4: Demographics & Comorbidities (Split View) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          <!-- Age Distribution Card -->
+          <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div>
+              <h3 class="font-bold text-slate-800 text-base flex items-center gap-1.5">
+                <i class="fa-solid fa-cake-candles text-brand-600"></i> Age Distribution
+              </h3>
+              <p class="text-xs text-slate-500 mb-4 font-sans font-sans">Breakdown of patient demographics undergoing screening</p>
+              <div class="relative h-[250px] w-full">
+                <canvas id="age-chart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Other Abnormalities Breakdown -->
+          <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div>
+              <h3 class="font-bold text-slate-800 text-base flex items-center gap-1.5">
+                <i class="fa-solid fa-chart-column text-brand-600"></i> Other Findings
+              </h3>
+              <p class="text-xs text-slate-500 mb-4 font-sans">Other anatomical findings flagged besides TB</p>
+              
+              <div id="findings-progress-bars" class="space-y-4 font-sans">
+                <!-- Live updated bars go here -->
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- Sliding Drawer: Patient Medical Profile Details -->
+  <div id="patient-drawer" class="fixed inset-y-0 right-0 z-50 w-full sm:w-[500px] bg-white border-l border-slate-200 shadow-2xl transform translate-x-full transition-transform duration-300 ease-out flex flex-col">
+    <!-- Drawer Header -->
+    <div class="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+      <div>
+        <h3 id="drawer-case-title" class="font-black text-lg text-slate-800">Clinical Patient Case File</h3>
+        <p class="text-xs text-slate-500">Radiology Diagnostic Details & Inspectra AI Output</p>
+      </div>
+      <button onclick="app.closePatientDrawer()" class="text-slate-500 hover:text-slate-700 p-2 hover:bg-slate-100 rounded-xl transition">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <!-- Drawer Content -->
+    <div class="flex-1 overflow-y-auto p-6 space-y-6">
+      
+      <!-- Patient Demographic Grid -->
+      <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 grid grid-cols-2 gap-3.5 text-xs">
+        <div>
+          <span class="text-slate-500 block font-sans">Patient ID</span>
+          <strong id="drawer-patient-id" class="text-slate-800 text-sm">--</strong>
+        </div>
+        <div>
+          <span class="text-slate-500 block">Age / Gender</span>
+          <strong id="drawer-patient-age-gender" class="text-slate-700">--</strong>
+        </div>
+        <div>
+          <span class="text-slate-500 block">Accession ID</span>
+          <strong id="drawer-patient-accession" class="text-slate-700 font-sans font-sans font-sans">--</strong>
+        </div>
+        <div>
+          <span class="text-slate-500 block">Organization Location</span>
+          <strong id="drawer-patient-org" class="text-slate-700">--</strong>
+        </div>
+      </div>
+
+      <!-- TB Result Hero Card -->
+      <div id="drawer-tb-hero" class="p-4 rounded-xl flex items-center justify-between border">
+        <div>
+          <span class="text-xs uppercase tracking-widest font-bold opacity-85 block text-slate-500">Tuberculosis AI Flag</span>
+          <strong id="drawer-tb-badge" class="text-xl font-extrabold mt-1 block font-sans">--</strong>
+        </div>
+        <div id="drawer-tb-icon" class="h-12 w-12 rounded-xl flex items-center justify-center text-lg shadow-inner">
+          <i class="fa-solid fa-virus"></i>
+        </div>
+      </div>
+
+      <!-- X-ray Path Links -->
+      <div class="space-y-3">
+        <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Inspectra Platform Diagnostic Paths</h4>
+        <div class="grid grid-cols-1 gap-2">
+          
+          <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 flex items-center justify-between text-xs">
+            <span class="text-slate-600"><i class="fa-solid fa-image text-brand-600 mr-2 animate-pulse"></i>Original Chest PA</span>
+            <a id="drawer-link-cxr" href="#" target="_blank" class="text-brand-700 hover:underline">Inspect <i class="fa-solid fa-arrow-up-right-from-square ml-1"></i></a>
+          </div>
+
+          <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 flex items-center justify-between text-xs">
+            <span class="text-slate-600"><i class="fa-solid fa-fire text-amber-500 mr-2"></i>Inspectra Heatmap</span>
+            <a id="drawer-link-heatmap" href="#" target="_blank" class="text-amber-600 hover:underline font-sans font-sans">Heatmap <i class="fa-solid fa-arrow-up-right-from-square ml-1 font-sans font-sans"></i></a>
+          </div>
+
+          <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 flex items-center justify-between text-xs animate-fade-in">
+            <span class="text-slate-600"><i class="fa-solid fa-circle-nodes text-indigo-500 mr-2 animate-fade-in"></i>Inspectra CTR Output</span>
+            <a id="drawer-link-ctr" href="#" target="_blank" class="text-indigo-600 hover:underline font-sans font-sans">CTR Image <i class="fa-solid fa-arrow-up-right-from-square ml-1"></i></a>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Other Medical findings table -->
+      <div class="space-y-3 font-sans">
+        <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">All Anatomical Flags Breakdown</h4>
+        <div class="bg-white rounded-xl border border-slate-200 overflow-hidden text-xs">
+          <div class="grid grid-cols-2 bg-slate-50 p-3 border-b border-slate-100 font-bold text-slate-500">
+            <span>Finding Pathology</span>
+            <span class="text-right">Risk/Value</span>
+          </div>
+          <div id="drawer-pathologies-list" class="divide-y divide-slate-100">
+            <!-- Rendered list of findings like Atelectasis, Cardiomegaly etc. -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Metadata -->
+      <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2 text-xs">
+        <div class="flex justify-between animate-pulse">
+          <span class="text-slate-500">Record Created</span>
+          <span id="drawer-create-date" class="text-slate-700 font-mono">--</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">Radiologist Feedback</span>
+          <span id="drawer-radiologist" class="text-slate-700">No Feedback</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Core Javascript Controller Logic -->
+  <script>
+    // System Constants
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'tb-screening-dashboard';
+
+    // Completely empty database array representing a clean start.
+    const emptyDataset = [];
+
+    // Global App State
+    class AppController {
+      constructor() {
+        this.rawData = [];
+        this.patients = [];
+        this.overviewChart = null;
+        this.ageChart = null;
+        this.uploadedFiles = []; // Holds arrays of { id, name, size, count, rows }
+      }
+
+      init() {
+        this.setupEventListeners();
+        this.resetToDemo();
+      }
+
+      setupEventListeners() {
+        // File Drag and Drop Listeners
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-uploader');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        
+        dropZone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          dropZone.classList.add('border-brand-500', 'bg-purple-50/50');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+          dropZone.classList.remove('border-brand-500', 'bg-purple-50/50');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          dropZone.classList.remove('border-brand-500', 'bg-purple-50/50');
+          if (e.dataTransfer.files.length > 0) {
+            this.handleFilesUpload(e.dataTransfer.files);
+          }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+          if (e.target.files.length > 0) {
+            this.handleFilesUpload(e.target.files);
+          }
+        });
+
+        // Close Drawer when clicking outside
+        document.addEventListener('click', (e) => {
+          const drawer = document.getElementById('patient-drawer');
+          if (drawer && !drawer.contains(e.target) && !e.target.closest('tr') && !e.target.closest('button')) {
+            this.closePatientDrawer();
+          }
+        });
+      }
+
+      // Reset to empty state to let user upload custom data
+      resetToDemo() {
+        this.rawData = [];
+        this.uploadedFiles = [];
+        this.processDataset(this.rawData);
+        this.updateFilesListUI();
+
+        // Reset the file selector value completely
+        const fileInput = document.getElementById('file-uploader');
+        if (fileInput) {
+          fileInput.value = "";
+        }
+
+        this.showToast("Workspace initialized. Please upload your CSV or XLSX file.", "info");
+      }
+
+      // Handle Multiple File Upload
+      async handleFilesUpload(filesList) {
+        const fileCount = filesList.length;
+        if (fileCount === 0) return;
+
+        document.getElementById('data-status-label').textContent = `Parsing ${fileCount} file(s)...`;
+        document.getElementById('data-status-label').className = "text-brand-600 font-bold animate-pulse";
+
+        let successCount = 0;
+
+        for (let i = 0; i < fileCount; i++) {
+          const file = filesList[i];
+          
+          // Check for duplicate uploads by looking at file name and size
+          if (this.uploadedFiles.some(f => f.name === file.name && f.size === file.size)) {
+            this.showToast(`"${file.name}" is already ingested into the workspace.`, "info");
+            continue;
+          }
+
+          try {
+            const data = await this.parseSingleFile(file);
+            if (data && data.length > 0) {
+              const fileId = 'file-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+              this.uploadedFiles.push({
+                id: fileId,
+                name: file.name,
+                size: file.size,
+                count: data.length,
+                rows: data
+              });
+              successCount++;
+            } else {
+              this.showToast(`"${file.name}" has no parseable rows.`, "error");
+            }
+          } catch (err) {
+            this.showToast(`Failed to parse ${file.name}: ${err.message}`, "error");
+          }
+        }
+
+        if (successCount > 0) {
+          this.recompileAndProcess();
+          this.showToast(`Successfully added ${successCount} file(s).`, "success");
+        } else {
+          this.updateFilesListUI();
+        }
+
+        // Reset the file input value so exact same files can be reuploaded
+        const fileInput = document.getElementById('file-uploader');
+        if (fileInput) fileInput.value = "";
+      }
+
+      // Helper Promise wrapper to parse a single file (CSV or XLSX)
+      parseSingleFile(file) {
+        return new Promise((resolve, reject) => {
+          const extension = file.name.split('.').pop().toLowerCase();
+          const reader = new FileReader();
+
+          if (extension === 'csv') {
+            Papa.parse(file, {
+              header: true,
+              skipEmptyLines: true,
+              complete: (results) => {
+                resolve(results.data || []);
+              },
+              error: (err) => {
+                reject(err);
+              }
+            });
+          } else if (extension === 'xlsx' || extension === 'xls') {
+            reader.onload = (e) => {
+              try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                resolve(jsonData || []);
+              } catch (err) {
+                reject(err);
+              }
+            };
+            reader.onerror = (err) => reject(err);
+            reader.readAsArrayBuffer(file);
+          } else {
+            reject(new Error("Unsupported file format. Please use .csv, .xlsx or .xls"));
+          }
+        });
+      }
+
+      // Recompiles the aggregate list from active uploadedFiles and runs calculation pipeline
+      recompileAndProcess() {
+        let aggregatedRows = [];
+        this.uploadedFiles.forEach(file => {
+          aggregatedRows = aggregatedRows.concat(file.rows);
+        });
+
+        this.rawData = aggregatedRows;
+        this.processDataset(this.rawData);
+        this.updateFilesListUI();
+      }
+
+      // Removes a file card from sidebar list and recompiles workspace
+      removeFile(fileId) {
+        const index = this.uploadedFiles.findIndex(f => f.id === fileId);
+        if (index !== -1) {
+          const fileName = this.uploadedFiles[index].name;
+          this.uploadedFiles.splice(index, 1);
+          this.recompileAndProcess();
+          this.showToast(`Removed file "${fileName}".`, "info");
+        }
+      }
+
+      // Render Active Files list in the sidebar
+      updateFilesListUI() {
+        const container = document.getElementById('active-files-container');
+        const list = document.getElementById('active-files-list');
+        list.innerHTML = '';
+
+        if (this.uploadedFiles.length === 0) {
+          container.classList.add('hidden');
+          document.getElementById('data-status-label').textContent = "Awaiting Upload";
+          document.getElementById('data-status-label').className = "text-slate-500 font-bold";
+          const ping = document.getElementById('pipeline-ping');
+          if (ping) ping.className = "h-2 w-2 rounded-full bg-slate-400";
+          return;
+        }
+
+        container.classList.remove('hidden');
+        document.getElementById('data-status-label').textContent = "Data Ingested";
+        document.getElementById('data-status-label').className = "text-brand-700 font-bold";
+        const ping = document.getElementById('pipeline-ping');
+        if (ping) ping.className = "h-2 w-2 rounded-full bg-brand-600 animate-ping";
+
+        this.uploadedFiles.forEach(file => {
+          const fileExt = file.name.split('.').pop().toLowerCase();
+          const fileIcon = fileExt === 'csv' ? 'fa-file-csv text-brand-600' : 'fa-file-excel text-emerald-600';
+
+          const cardHTML = `
+            <div class="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between shadow-sm transition hover:shadow-md">
+              <div class="flex items-center gap-2.5 overflow-hidden">
+                <i class="fa-solid ${fileIcon} text-lg shrink-0"></i>
+                <div class="overflow-hidden">
+                  <p class="text-xs font-bold text-slate-700 truncate max-w-[140px]" title="${file.name}">${file.name}</p>
+                  <p class="text-[10px] text-slate-500">${file.count} patient profiles</p>
+                </div>
+              </div>
+              <button onclick="app.removeFile('${file.id}')" class="text-slate-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition" title="Clear this file">
+                <i class="fa-solid fa-xmark text-sm font-sans"></i>
+              </button>
+            </div>
+          `;
+          list.insertAdjacentHTML('beforeend', cardHTML);
+        });
+      }
+
+      // Main Data Clean, Preprocessing and Normalization Mapping
+      processDataset(rows) {
+        this.patients = rows.map((row, index) => {
+          // Standardize Keys to strip potential CSV padding/carriage returns
+          const cleanRow = {};
+          Object.keys(row).forEach(key => {
+            cleanRow[key.trim()] = String(row[key]).trim();
+          });
+
+          // Core variables matching schema (anonymized names entirely)
+          const pid = cleanRow['Patient Id'] || cleanRow['Patient ID'] || cleanRow['PatientID'] || `ID-${100000 + index}`;
+          const accession = cleanRow['Accession Number'] || cleanRow['AccessionNumber'] || cleanRow['Accession'] || '--';
+          const gender = cleanRow['Gender'] || 'U';
+          
+          // Preprocess and sanitize Patient Age (empty, null, undefined, 0, or 0.0 standardizing to Unknown)
+          let age = cleanRow['Patient Age'] || cleanRow['Age'] || '';
+          age = age.trim();
+          if (age === '' || age === '0' || age === '0.0' || age.toLowerCase() === 'null' || age.toLowerCase() === 'undefined') {
+            age = 'Unknown';
+          }
+
+          const studyDate = cleanRow['Patient Study Date'] || cleanRow['Create Date'] || cleanRow['Study Date'] || '2026-05-20';
+          const studyTime = cleanRow['Patient Study Time'] || cleanRow['Create Time'] || cleanRow['Study Time'] || '00:00:00';
+          const org = cleanRow['Organization Name'] || cleanRow['Organization'] || 'General Clinic';
+          
+          // TB Evaluation: if text is NOT 'low' and NOT empty, it is AI Detected
+          const tbValue = cleanRow['Tuberculosis'] || cleanRow['tuberculosis'] || cleanRow['TB'] || '';
+          const isDetected = tbValue.toLowerCase() !== 'low' && tbValue !== '';
+
+          // Normalize percentages (e.g. 75% or 75) to a standard scale of 0.0 - 1.0 for probability bands
+          let tbScore = NaN;
+          const tbClean = tbValue.trim().toLowerCase();
+          if (tbClean !== 'low' && tbClean !== '') {
+            const isPercent = tbClean.includes('%');
+            let num = parseFloat(tbClean.replace(/%/g, ''));
+            if (!isNaN(num)) {
+              if (isPercent || num > 1.0) {
+                tbScore = num / 100;
+              } else {
+                tbScore = num;
+              }
+            }
+          }
+
+          // Robust normalization helper for other comorbid pathologies
+          const normalizePathology = (val) => {
+            if (!val) return 'Low';
+            const clean = String(val).trim().toLowerCase();
+            if (clean === 'low' || clean === '') return 'Low';
+            const isPercent = clean.includes('%');
+            let num = parseFloat(clean.replace(/%/g, ''));
+            if (!isNaN(num)) {
+              if (isPercent || num > 1.0) {
+                return (num / 100).toFixed(2);
+              }
+              return num.toFixed(2);
+            }
+            return val;
+          };
+
+          const cardiomegaly = normalizePathology(cleanRow['Cardiomegaly']);
+          const atelectasis = normalizePathology(cleanRow['Atelectasis']);
+          const nodule = normalizePathology(cleanRow['Nodule']);
+          const lungOpacity = normalizePathology(cleanRow['Lung Opacity']);
+          const effusion = normalizePathology(cleanRow['Pleural Effusion']);
+          const mass = normalizePathology(cleanRow['Mass']);
+          const pulmonaryEdema = normalizePathology(cleanRow['Pulmonary Edema']); // Map Pulmonary Edema pathology
+          
+          return {
+            id: pid,
+            accession: accession,
+            gender: gender,
+            age: age,
+            date: studyDate,
+            time: studyTime,
+            org: org,
+            tbStatus: isDetected ? 'Detected' : 'Normal',
+            tbValue: tbValue, // displays raw value from CSV (e.g. "75%" or "0.75")
+            tbScore: tbScore, // standardized numeric value for stratification (0.0 to 1.0)
+            findings: {
+              Tuberculosis: tbValue,
+              Cardiomegaly: cardiomegaly,
+              Atelectasis: atelectasis,
+              Nodule: nodule,
+              LungOpacity: lungOpacity,
+              PleuralEffusion: effusion,
+              Mass: mass,
+              PulmonaryEdema: pulmonaryEdema // Add Pulmonary Edema pathology to findings dict
+            },
+            originalRow: cleanRow
+          };
+        });
+
+        // Refresh calculations and UI views
+        this.calculateMetrics();
+        this.renderAllViews();
+      }
+
+      calculateMetrics() {
+        const total = this.patients.length;
+        const detected = this.patients.filter(p => p.tbStatus === 'Detected').length;
+        const low = this.patients.filter(p => p.tbStatus === 'Normal').length;
+        
+        // TB Detection Rate calculated dynamically from total screened
+        const rate = total > 0 ? ((detected / total) * 100).toFixed(1) : "0.0";
+
+        // Feed core metric DOM elements
+        document.getElementById('stat-total-screened').textContent = total.toLocaleString();
+        document.getElementById('stat-total-detected').textContent = detected.toLocaleString();
+        document.getElementById('stat-total-low').textContent = low.toLocaleString();
+        document.getElementById('stat-detection-rate').textContent = `${rate}%`;
+
+        // Calculate severity group counts: below 50, 50-70, 70 up (using tbScore!)
+        let below50 = 0;
+        let range50to70 = 0;
+        let above70 = 0;
+
+        this.patients.forEach(p => {
+          const val = p.tbScore; // Safely use the parsed and normalized float
+          if (!isNaN(val)) {
+            if (val < 0.50) {
+              below50++;
+            } else if (val >= 0.50 && val <= 0.70) {
+              range50to70++;
+            } else if (val > 0.70) {
+              above70++;
+            }
+          }
+        });
+
+        document.getElementById('stat-tb-below-50').textContent = below50.toLocaleString();
+        document.getElementById('stat-tb-50-70').textContent = range50to70.toLocaleString();
+        document.getElementById('stat-tb-70-up').textContent = above70.toLocaleString();
+
+        // Update finding counts for general comorbid rates including Pulmonary Edema
+        const findingsList = ['Cardiomegaly', 'Atelectasis', 'Nodule', 'LungOpacity', 'PleuralEffusion', 'Mass', 'PulmonaryEdema'];
+        const container = document.getElementById('findings-progress-bars');
+        container.innerHTML = '';
+
+        findingsList.forEach(field => {
+          let flagged = 0;
+          this.patients.forEach(p => {
+            const val = p.findings[field];
+            if (val && val.toLowerCase() !== 'low' && val !== '') flagged++;
+          });
+
+          const pct = total > 0 ? ((flagged / total) * 100).toFixed(0) : 0;
+          const label = field.replace(/([A-Z])/g, ' $1').trim();
+
+          const barHTML = `
+            <div>
+              <div class="flex justify-between text-xs font-semibold mb-1">
+                <span class="text-slate-600">${label}</span>
+                <span class="text-brand-600 font-mono font-bold">${flagged} cases (${pct}%)</span>
+              </div>
+              <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                <div class="bg-brand-500 h-full transition-all duration-500" style="width: ${pct}%"></div>
+              </div>
+            </div>
+          `;
+          container.insertAdjacentHTML('beforeend', barHTML);
+        });
+      }
+
+      // Group statistics by Date
+      getDateAggregate() {
+        const group = {};
+        this.patients.forEach(p => {
+          const dt = p.date;
+          if (!group[dt]) {
+            group[dt] = { date: dt, total: 0, detected: 0, normal: 0 };
+          }
+          group[dt].total++;
+          if (p.tbStatus === 'Detected') group[dt].detected++;
+          else group[dt].normal++;
+        });
+
+        // Return sorted array
+        return Object.values(group).sort((a, b) => new Date(a.date) - new Date(b.date));
+      }
+
+      // Overview dashboard Chart - Configured with Dual Y-Axes
+      renderOverviewChart() {
+        const canvas = document.getElementById('overview-chart');
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        const aggregates = this.getDateAggregate();
+        
+        const labels = aggregates.map(a => a.date);
+        const totals = aggregates.map(a => a.total);
+        const detected = aggregates.map(a => a.detected);
+
+        if (this.overviewChart) {
+          this.overviewChart.destroy();
+        }
+
+        this.overviewChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                type: 'bar',
+                label: 'Total Screened',
+                data: totals,
+                backgroundColor: 'rgba(147, 51, 234, 0.65)',
+                borderColor: '#9333ea',
+                borderWidth: 1.5,
+                borderRadius: 6,
+                yAxisID: 'yLeft', // Maps to the left Y-axis
+                order: 2
+              },
+              {
+                type: 'line',
+                label: 'TB Detected Cases',
+                data: detected,
+                borderColor: '#f43f5e',
+                backgroundColor: 'transparent',
+                borderWidth: 3,
+                tension: 0.3,
+                pointBackgroundColor: '#f43f5e',
+                pointRadius: 4,
+                yAxisID: 'yRight', // Maps to the right Y-axis
+                order: 1
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: true,
+                labels: { color: '#475569', font: { size: 10, weight: 'bold' } }
+              },
+              tooltip: {
+                backgroundColor: '#ffffff',
+                titleColor: '#1e1b4b',
+                bodyColor: '#475569',
+                borderColor: '#e2e8f0',
+                borderWidth: 1,
+                padding: 10,
+                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+              }
+            },
+            scales: {
+              x: {
+                grid: { display: false },
+                ticks: { color: '#64748b', font: { size: 10 } }
+              },
+              yLeft: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                grid: { color: '#f1f5f9' },
+                ticks: { color: '#64748b', font: { size: 10 } },
+                title: {
+                  display: true,
+                  text: 'Total Screened (Patients)',
+                  color: '#9333ea',
+                  font: { size: 10, weight: 'bold' }
+                }
+              },
+              yRight: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                grid: { drawOnChartArea: false },
+                ticks: { color: '#64748b', font: { size: 10 }, stepSize: 1 },
+                title: {
+                  display: true,
+                  text: 'TB Detected Cases (AI)',
+                  color: '#f43f5e',
+                  font: { size: 10, weight: 'bold' }
+                }
+              }
+            }
+          }
+        });
+      }
+
+      // Render Age Distribution Bar Chart (Age of 0 or empty mapped strictly to Unknown)
+      renderAgeDistributionChart() {
+        const canvas = document.getElementById('age-chart');
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        
+        // Define age cohorts
+        const bins = {
+          'Under 18': 0,
+          '18-29': 0,
+          '30-45': 0,
+          '46-60': 0,
+          '60+': 0,
+          'Unknown': 0
+        };
+
+        this.patients.forEach(p => {
+          const ageNum = parseInt(p.age);
+          // If age values parsed are NaN, negative, or exactly 0, they belong strictly to "Unknown"
+          if (isNaN(ageNum) || ageNum <= 0) {
+            bins['Unknown']++;
+          } else {
+            if (ageNum < 18) {
+              bins['Under 18']++;
+            } else if (ageNum >= 18 && ageNum <= 29) {
+              bins['18-29']++;
+            } else if (ageNum >= 30 && ageNum <= 45) {
+              bins['30-45']++;
+            } else if (ageNum >= 46 && ageNum <= 60) {
+              bins['46-60']++;
+            } else if (ageNum > 60) {
+              bins['60+']++;
+            }
+          }
+        });
+
+        const labels = Object.keys(bins);
+        const data = Object.values(bins);
+
+        if (this.ageChart) {
+          this.ageChart.destroy();
+        }
+
+        this.ageChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Patient Count',
+              data: data,
+              backgroundColor: 'rgba(147, 51, 234, 0.75)',
+              borderColor: '#9333ea',
+              borderWidth: 1.5,
+              borderRadius: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#ffffff',
+                titleColor: '#1e1b4b',
+                bodyColor: '#475569',
+                borderColor: '#e2e8f0',
+                borderWidth: 1,
+                padding: 10,
+                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+              }
+            },
+            scales: {
+              y: {
+                grid: { color: '#f1f5f9' },
+                ticks: { color: '#64748b', font: { size: 10 }, stepSize: 1 }
+              },
+              x: {
+                grid: { display: false },
+                ticks: { color: '#64748b', font: { size: 10 } }
+              }
+            }
+          }
+        });
+      }
+
+      // Slide-over Details Drawer
+      openPatientDrawer(id) {
+        const p = this.patients.find(x => x.id === id);
+        if (!p) return;
+
+        // Custom Title without name
+        document.getElementById('drawer-case-title').textContent = `Clinical Case File: ${p.id}`;
+        document.getElementById('drawer-patient-id').textContent = p.id;
+
+        // Display clinical age/gender gracefully
+        const displayAge = p.age === 'Unknown' ? 'Unknown' : `${p.age} Years`;
+        document.getElementById('drawer-patient-age-gender').textContent = `${displayAge} / ${p.gender}`;
+        document.getElementById('drawer-patient-accession').textContent = p.accession;
+        document.getElementById('drawer-patient-org').textContent = p.org;
+
+        // Custom image path bindings
+        const linkCxr = document.getElementById('drawer-link-cxr');
+        linkCxr.href = p.originalRow['Image Path'] || '#';
+        linkCxr.title = p.originalRow['Image Path'] || 'No PA original chest X-ray path found';
+
+        const linkHeatmap = document.getElementById('drawer-link-heatmap');
+        if (p.originalRow['Inspectra Heatmap Path']) {
+          linkHeatmap.href = p.originalRow['Inspectra Heatmap Path'];
+          linkHeatmap.parentElement.classList.remove('opacity-50');
+        } else {
+          linkHeatmap.href = '#';
+          linkHeatmap.parentElement.classList.add('opacity-50');
+        }
+
+        const linkCtr = document.getElementById('drawer-link-ctr');
+        if (p.originalRow['Inspectra Ctr Path']) {
+          linkCtr.href = p.originalRow['Inspectra Ctr Path'];
+          linkCtr.parentElement.classList.remove('opacity-50');
+        } else {
+          linkCtr.href = '#';
+          linkCtr.parentElement.classList.add('opacity-50');
+        }
+
+        // TB Level design badge custom styling
+        const tbBadge = document.getElementById('drawer-tb-badge');
+        const tbContainer = document.getElementById('drawer-tb-hero');
+        const tbIcon = document.getElementById('drawer-tb-icon');
+        
+        if (p.tbStatus === 'Detected') {
+          tbBadge.textContent = `AI DETECTED (${p.tbValue})`;
+          tbBadge.className = "text-xl font-extrabold text-rose-600 tracking-tight block mt-1";
+          tbContainer.className = "p-4 rounded-xl flex items-center justify-between border border-rose-200 bg-rose-50";
+          tbIcon.className = "h-12 w-12 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center text-lg shadow-inner";
+        } else {
+          tbBadge.textContent = "Normal / Negative (LOW)";
+          tbBadge.className = "text-xl font-extrabold text-emerald-600 tracking-tight block mt-1";
+          tbContainer.className = "p-4 rounded-xl flex items-center justify-between border border-emerald-200 bg-emerald-50";
+          tbIcon.className = "h-12 w-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg shadow-inner";
+        }
+
+        // Populate drawer paths
+        const pathologiesList = document.getElementById('drawer-pathologies-list');
+        pathologiesList.innerHTML = '';
+        
+        Object.keys(p.findings).forEach(key => {
+          if (key === 'Tuberculosis') return;
+          const val = p.findings[key];
+          const label = key.replace(/([A-Z])/g, ' $1').trim();
+          
+          const isHigh = val.toLowerCase() !== 'low' && val !== '';
+          const statusClass = isHigh ? "text-amber-700 font-bold font-mono bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100" : "text-slate-400 font-mono";
+          
+          pathologiesList.insertAdjacentHTML('beforeend', `
+            <div class="grid grid-cols-2 p-3 hover:bg-purple-50/40 transition">
+              <span class="text-slate-700 font-medium">${label}</span>
+              <span class="text-right ${statusClass}">${val}</span>
+            </div>
+          `);
+        });
+
+        document.getElementById('drawer-create-date').textContent = `${p.date} @ ${p.time}`;
+        document.getElementById('drawer-radiologist').textContent = p.originalRow['Radiologist Feedback'] || 'Pending clinical diagnosis remarks';
+
+        // Slide in drawer element
+        const drawer = document.getElementById('patient-drawer');
+        drawer.classList.remove('translate-x-full');
+      }
+
+      closePatientDrawer() {
+        const drawer = document.getElementById('patient-drawer');
+        drawer.classList.add('translate-x-full');
+      }
+
+      // Re-trigger visual updates for current loaded views
+      renderAllViews() {
+        this.renderOverviewChart();
+        this.renderAgeDistributionChart();
+      }
+
+      clearData() {
+        this.rawData = [];
+        this.patients = [];
+        this.uploadedFiles = [];
+        this.processDataset(this.rawData);
+        this.updateFilesListUI();
+
+        // Explicitly clear the value of the file input element!
+        const fileInput = document.getElementById('file-uploader');
+        if (fileInput) {
+          fileInput.value = "";
+        }
+
+        this.showToast("Workspace cleared. Ready for custom file upload.", "info");
+      }
+
+      // UI Toast Dispatcher
+      showToast(msg, type = 'info') {
+        const container = document.getElementById('toast-container');
+        const id = `toast-${Math.random().toString(36).substr(2, 9)}`;
+
+        const colors = {
+          success: 'bg-purple-50 text-brand-700 border-brand-200 shadow-md',
+          error: 'bg-rose-50 text-rose-700 border-rose-200 shadow-md',
+          info: 'bg-white border-slate-200 text-slate-700 shadow-md'
+        };
+
+        const icons = {
+          success: 'fa-circle-check',
+          error: 'fa-triangle-exclamation',
+          info: 'fa-circle-info'
+        };
+
+        const toastHTML = `
+          <div id="${id}" class="px-4 py-3 rounded-xl border ${colors[type]} flex items-center gap-3 animate-fade-in transition-all duration-300 transform translate-x-10 opacity-0 pointer-events-auto max-w-sm">
+            <i class="fa-solid ${icons[type]} text-base shrink-0"></i>
+            <span class="text-xs font-bold tracking-wide">${msg}</span>
+            <button onclick="document.getElementById('${id}').remove()" class="text-slate-400 hover:text-slate-600 transition ml-2">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        `;
+
+        container.insertAdjacentHTML('beforeend', toastHTML);
+        const element = document.getElementById(id);
+        
+        // Slide in
+        setTimeout(() => {
+          element.classList.remove('translate-x-10', 'opacity-0');
+        }, 10);
+
+        // Slide out and remove
+        setTimeout(() => {
+          if (element) {
+            element.classList.add('translate-x-10', 'opacity-0');
+            setTimeout(() => element.remove(), 300);
+          }
+        }, 4000);
+      }
+    }
+
+    // Launch Core Application
+    const app = new AppController();
+    window.onload = function() {
+      app.init();
+    }
+  </script>
+</body>
+</html>
