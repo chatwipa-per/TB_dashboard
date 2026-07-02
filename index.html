@@ -840,8 +840,12 @@
           else group[dt].normal++;
         });
 
-        // Return sorted array
-        return Object.values(group).sort((a, b) => new Date(a.date) - new Date(b.date));
+        // Safe chronological sorting parser
+        return Object.values(group).sort((a, b) => {
+          const timeA = new Date(a.date).getTime();
+          const timeB = new Date(b.date).getTime();
+          return timeA - timeB;
+        });
       }
 
       // Overview dashboard Chart - Configured with Dual Y-Axes
