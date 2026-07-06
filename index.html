@@ -66,6 +66,11 @@
       }
     }
     
+    /* Force FontAwesome font-family on FA classes to prevent font-sans inheritance breakage */
+    .fa-solid, .fa-regular, .fa-brands, i {
+      font-family: "Font Awesome 6 Free", "Font Awesome 6 Brands", fontAwesome !important;
+      font-weight: 900 !important;
+    }
   </style>
 </head>
 <body class="h-full text-slate-800 font-sans antialiased flex flex-col custom-gradient">
@@ -223,10 +228,10 @@
               <i class="fa-solid fa-heart-pulse"></i>
             </div>
             <div class="relative z-10 font-sans">
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest">Normal</p>
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest">Normal / Low Risk</p>
               <h3 id="stat-total-low" class="text-3xl font-extrabold text-emerald-600 mt-1.5 font-sans">0</h3>
               <p class="text-[11px] text-slate-500 mt-2 flex items-center gap-1 text-slate-500">
-                <i class="fa-solid fa-shield text-emerald-500"></i> Marked Negative AI
+                <i class="fa-solid fa-shield text-emerald-500"></i> Classifed as Low/Negative
               </p>
             </div>
             <div class="h-12 w-12 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center justify-center text-emerald-600 relative z-10 shrink-0 font-sans">
@@ -246,7 +251,7 @@
             <!-- Group A: Below 50 -->
             <div class="bg-white p-4 rounded-xl border border-emerald-100 shadow-sm flex items-center justify-between">
               <div>
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block font-sans">TB Probability<50% </span>
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block font-sans">TB Probability &lt; 50% </span>
                 <strong id="stat-tb-below-50" class="text-2xl font-extrabold text-emerald-600 mt-1 block">0</strong>
                 <span class="text-[10px] text-slate-400 block mt-1">Low to Moderate risk findings</span>
               </div>
@@ -270,12 +275,12 @@
             <!-- Group C: 70 Up -->
             <div class="bg-white p-4 rounded-xl border border-rose-100 shadow-sm flex items-center justify-between">
               <div>
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block font-sans">TB Probability >70% </span>
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block font-sans">TB Probability &gt; 70% </span>
                 <strong id="stat-tb-70-up" class="text-2xl font-extrabold text-rose-600 mt-1 block">0</strong>
                 <span class="text-[10px] text-slate-400 block mt-1 font-sans font-sans font-sans">High risk findings</span>
               </div>
               <div class="h-10 w-10 rounded-lg bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0">
-                <i class="fa-solid fa-triangle-exclamation text-base"></i>
+                <i class="fa-solid fa-triangle-exclamation text-base font-sans"></i>
               </div>
             </div>
 
@@ -288,6 +293,7 @@
             <h3 class="font-bold text-slate-800 text-base">TB Screening Progression Trend</h3>
             <p class="text-xs text-slate-500 font-sans">Daily breakdown of total undergoing screening (Left Axis) vs. AI detected cases (Right Axis)</p>
           </div>
+          <!-- Standard responsive full width container - scrolling eliminated -->
           <div class="relative h-[320px] w-full">
             <canvas id="overview-chart"></canvas>
           </div>
@@ -390,12 +396,12 @@
 
           <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 flex items-center justify-between text-xs">
             <span class="text-slate-600"><i class="fa-solid fa-fire text-amber-500 mr-2"></i>Inspectra Heatmap</span>
-            <a id="drawer-link-heatmap" href="#" target="_blank" class="text-amber-600 hover:underline font-sans font-sans">Heatmap <i class="fa-solid fa-arrow-up-right-from-square ml-1 font-sans font-sans"></i></a>
+            <a id="drawer-link-heatmap" href="#" target="_blank" class="text-amber-600 hover:underline font-sans font-sans">Heatmap <i class="fa-solid fa-arrow-up-right-from-square ml-1 font-sans font-sans font-sans"></i></a>
           </div>
 
           <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 flex items-center justify-between text-xs animate-fade-in">
             <span class="text-slate-600"><i class="fa-solid fa-circle-nodes text-indigo-500 mr-2 animate-fade-in"></i>Inspectra CTR Output</span>
-            <a id="drawer-link-ctr" href="#" target="_blank" class="text-indigo-600 hover:underline font-sans font-sans">CTR Image <i class="fa-solid fa-arrow-up-right-from-square ml-1"></i></a>
+            <a id="drawer-link-ctr" href="#" target="_blank" class="text-indigo-600 hover:underline font-sans font-sans">CTR Image <i class="fa-solid fa-arrow-up-right-from-square ml-1 font-sans font-sans font-sans"></i></a>
           </div>
 
         </div>
@@ -655,7 +661,7 @@
                 </div>
               </div>
               <button onclick="app.removeFile('${file.id}')" class="text-slate-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition" title="Clear this file">
-                <i class="fa-solid fa-xmark text-sm"></i>
+                <i class="fa-solid fa-xmark text-sm font-sans"></i>
               </button>
             </div>
           `;
@@ -831,21 +837,45 @@
       getDateAggregate() {
         const group = {};
         this.patients.forEach(p => {
-          const dt = p.date;
-          if (!group[dt]) {
-            group[dt] = { date: dt, total: 0, detected: 0, normal: 0 };
+          // Normalize input format to remove precise timestamp hours/seconds if present
+          let cleanDate = p.date.trim().split(/[ T]/)[0];
+          if (!group[cleanDate]) {
+            group[cleanDate] = { date: cleanDate, total: 0, detected: 0, normal: 0 };
           }
-          group[dt].total++;
-          if (p.tbStatus === 'Detected') group[dt].detected++;
-          else group[dt].normal++;
+          group[cleanDate].total++;
+          if (p.tbStatus === 'Detected') group[cleanDate].detected++;
+          else group[cleanDate].normal++;
         });
 
-        // Safe chronological sorting parser
-        return Object.values(group).sort((a, b) => {
-          const timeA = new Date(a.date).getTime();
-          const timeB = new Date(b.date).getTime();
-          return timeA - timeB;
-        });
+        // Helper to convert DD-MM-YYYY, DD/MM/YYYY, or standard YYYY-MM-DD to a sortable timestamp
+        const getTimestamp = (dateStr) => {
+          if (!dateStr) return 0;
+          const cleanStr = dateStr.trim();
+          
+          // Match DD-MM-YYYY or DD/MM/YYYY
+          const dmyMatch = cleanStr.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+          if (dmyMatch) {
+            const day = parseInt(dmyMatch[1], 10);
+            const month = parseInt(dmyMatch[2], 10) - 1; // 0-indexed month
+            const year = parseInt(dmyMatch[3], 10);
+            return new Date(year, month, day).getTime();
+          }
+
+          // Match YYYY-MM-DD or YYYY/MM/DD
+          const ymdMatch = cleanStr.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+          if (ymdMatch) {
+            const year = parseInt(ymdMatch[1], 10);
+            const month = parseInt(ymdMatch[2], 10) - 1; // 0-indexed month
+            const day = parseInt(ymdMatch[3], 10);
+            return new Date(year, month, day).getTime();
+          }
+
+          const parsed = new Date(cleanStr);
+          return isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+        };
+
+        // Sort chronologically using the custom timestamp parser
+        return Object.values(group).sort((a, b) => getTimestamp(a.date) - getTimestamp(b.date));
       }
 
       // Overview dashboard Chart - Configured with Dual Y-Axes
